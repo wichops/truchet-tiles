@@ -11,7 +11,7 @@ const HEIGHT: u32 = ROWS * SIZE;
 fn main() {
     nannou::app(model)
         .update(update)
-        .loop_mode(LoopMode::loop_once())
+        .loop_mode(LoopMode::wait())
         .run();
 }
 
@@ -37,6 +37,7 @@ fn model(app: &App) -> Model {
     let _window = app
         .new_window()
         .view(view)
+        .key_pressed(key_pressed)
         .size(WIDTH, HEIGHT)
         .build()
         .unwrap();
@@ -98,4 +99,14 @@ fn view(app: &App, model: &Model, frame: Frame) {
     }
 
     draw.to_frame(app, &frame).unwrap();
+}
+
+fn key_pressed(app: &App, _model: &mut Model, key: Key) {
+    match key {
+        Key::S => {
+            app.main_window()
+                .capture_frame(app.exe_name().unwrap() + ".png");
+        }
+        _other_key => {}
+    }
 }
