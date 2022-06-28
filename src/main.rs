@@ -1,10 +1,14 @@
-use nannou::prelude::*;
+use nannou::noise::{NoiseFn, Perlin, Seedable};
+use nannou::rand::rngs::StdRng;
+use nannou::rand::seq::SliceRandom;
+use nannou::rand::{Rng, SeedableRng};
+use nannou::{color::rgb_u32, prelude::*};
+use paleta_rs;
 
-const ROWS: u32 = 24;
-const COLS: u32 = 24;
+const ROWS: u32 = 16;
+const COLS: u32 = 16;
 
-const SIZE: u32 = 20;
-
+const SIZE: u32 = 48;
 const WIDTH: u32 = COLS * SIZE;
 const HEIGHT: u32 = ROWS * SIZE;
 
@@ -26,16 +30,23 @@ struct Tile {
     y: f32,
     rotation: f32,
     points: (Point, Point, Point),
+    color: Rgb<u8>,
 }
 
 struct Model {
     _window: window::Id,
     tiles: Vec<Tile>,
+    random_seed: u64,
 }
 
+fn get_random_palette(rng: &mut StdRng) -> [u32; 5] {
+    let palettes = paleta_rs::all_hex();
+    *palettes.choose(rng).unwrap()
+}
 fn model(app: &App) -> Model {
     let _window = app
         .new_window()
+        .title(app.exe_name().unwrap())
         .view(view)
         .key_pressed(key_pressed)
         .size(WIDTH, HEIGHT)
@@ -43,35 +54,50 @@ fn model(app: &App) -> Model {
         .unwrap();
 
     let mut tiles = Vec::new();
+    let points = (
+        Point { x: 0.5, y: 0.5 },
+        Point { x: -0.5, y: 0.5 },
+        Point { x: 0.5, y: -0.5 },
+    );
+    let random_seed = random_range(0, 100000);
 
+    // let range_x = model.random_range.gen_range(-0.5..0.5);
+    // let range_y = model.random_range.gen_range(-1.0..1.0);
     for y in 0..ROWS {
         for x in 0..COLS {
-            let points = (
-                Point { x: 0.5, y: 0.5 },
-                Point { x: -0.5, y: 0.5 },
-                Point { x: 0.5, y: -0.5 },
-            );
+            // let colors = vec![0xCC0C39, 0xE6781E, 0xC8CF02];
+            // let color = rgb_u32(colors[random_range::<usize>(0, 3)]);
 
-            let rotation: f32 = match random_range::<i32>(0, 4) {
-                0 => deg_to_rad(90.0),
-                1 => deg_to_rad(180.0),
-                2 => deg_to_rad(270.0),
-                _ => deg_to_rad(0.0),
-            };
             let tile = Tile {
                 x: x as f32,
                 y: y as f32,
-                points,
-                rotation,
+                points: points.clone(),
+                rotation: 0.0,
+                color: BLACK,
             };
 
             tiles.push(tile);
         }
     }
-    Model { _window, tiles }
+    Model {
+        _window,
+        tiles,
+        random_seed,
+    }
 }
 
-fn update(_app: &App, _model: &mut Model, _update: Update) {}
+fn update(_app: &App, model: &mut Model, _update: Update) {
+    let mut rng = StdRng::seed_from_u64(model.random_seed);
+    let palette = get_random_palette(&mut rng);
+
+    for tile in &mut model.tiles {
+        let multiplier: i32 = rng.gen_range(0..4);
+        let rotation = deg_to_rad(90.0 * multiplier as f32);
+
+        tile.rotation = rotation;
+        tile.color = rgb_u32(*palette.choose(&mut rng).unwrap());
+    }
+}
 
 fn view(app: &App, model: &Model, frame: Frame) {
     let draw = app.draw();
@@ -92,7 +118,7 @@ fn view(app: &App, model: &Model, frame: Frame) {
 
         cdraw
             .tri()
-            .color(BLACK)
+            .color(t.color)
             .w_h(1.0, 1.0)
             .rotate(t.rotation)
             .points(point1, point2, point3);
@@ -101,11 +127,17 @@ fn view(app: &App, model: &Model, frame: Frame) {
     draw.to_frame(app, &frame).unwrap();
 }
 
-fn key_pressed(app: &App, _model: &mut Model, key: Key) {
+fn key_pressed(app: &App, model: &mut Model, key: Key) {
     match key {
+        Key::R => {
+            model.random_seed = random_range(0, 1000000);
+        }
         Key::S => {
-            app.main_window()
-                .capture_frame(app.exe_name().unwrap() + ".png");
+            let screenshot_name =
+                format!("{}{:03}.png", app.exe_name().unwrap(), model.random_seed);
+
+            println!("Saving screenshot to: {}", screenshot_name);
+            app.main_window().capture_frame(screenshot_name);
         }
         _other_key => {}
     }
